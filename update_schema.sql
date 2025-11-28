@@ -1,11 +1,11 @@
 -- Add cohort_id to profiles
-alter table profiles add column cohort_id text;
+alter table profiles add column if not exists cohort_id text;
 
--- Add achievement counters if they don't exist (some might be missing from initial schema)
-alter table profiles add column night_owl_count integer default 0;
-alter table profiles add column streak_7_count integer default 0;
-alter table profiles add column finals_won integer default 0;
-alter table profiles add column top_3_finishes integer default 0;
+-- Add achievement counters if they don't exist
+alter table profiles add column if not exists night_owl_count integer default 0;
+alter table profiles add column if not exists streak_7_count integer default 0;
+alter table profiles add column if not exists finals_won integer default 0;
+alter table profiles add column if not exists top_3_finishes integer default 0;
 
 -- Function to find an open cohort
 create or replace function get_open_cohort(user_league text)

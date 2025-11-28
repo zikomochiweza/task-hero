@@ -10,7 +10,7 @@ const LeagueView = () => {
   // Fetch Leaderboard Data
   useEffect(() => {
     const fetchLeaderboard = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('league', user.league)

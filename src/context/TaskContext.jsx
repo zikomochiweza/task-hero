@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { LEAGUES, MOCK_USERS, getLeagueThresholds } from '../data/mockData';
+import { LEAGUES, getLeagueThresholds } from '../data/mockData';
 import { supabase } from '../supabaseClient';
 
 const TaskContext = createContext();
@@ -83,13 +83,26 @@ export const TaskProvider = ({ children }) => {
             setUser(prev => ({ ...prev, ...newProfile }));
         }
       } else if (data) {
-        // Profile exists, update local state
+        // Profile exists, check for cohort assignment
+        let cohortId = data.cohort_id;
+
+        // Auto-assign cohort if missing (migration for existing users)
+        if (!cohortId) {
+            const { data: newCohortId } = await supabase.rpc('get_open_cohort', { user_league: data.league || 'Bronze' });
+            if (newCohortId) {
+                await supabase.from('profiles').update({ cohort_id: newCohortId }).eq('id', authUser.id);
+                cohortId = newCohortId;
+            }
+        }
+
+        // Update local state
         setUser(prev => ({
             ...prev,
             name: data.name,
             email: data.email,
             xp: data.xp,
             league: data.league,
+            cohortId: cohortId,
             streak: data.streak,
             completedTasks: data.completed_tasks || 0,
             nightOwlCount: data.night_owl_count || 0,
@@ -133,6 +146,7 @@ export const TaskProvider = ({ children }) => {
   };
 
   // Weekly Reset Logic (Client-Side Check)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const processWeeklyReset = async () => {
     console.log("Processing Weekly Reset...");
     
@@ -181,18 +195,6 @@ export const TaskProvider = ({ children }) => {
         finalsWon: myRank === 1 ? (user.finalsWon || 0) + 1 : (user.finalsWon || 0),
         top3Finishes: myRank <= 3 ? (user.top3Finishes || 0) + 1 : (user.top3Finishes || 0)
     };
-
-    // We need to pass 'cohort_id' explicitly to updateProfileInSupabase if we want it to sync
-    // But updateProfileInSupabase maps camelCase to snake_case, so we need to add cohort_id to the mapping there?
-    // Wait, I didn't add cohort_id to the mapping in the previous step. Let's fix that by passing it directly in the DB update inside updateProfileInSupabase
-    // Actually, let's just update the mapping in the previous step (I can't go back).
-    // I will assume I can update the mapping in the next step or just do a direct update here.
-    // Better: I'll update updateProfileInSupabase to handle cohort_id in the next tool call if I missed it, 
-    // BUT I can just pass the snake_case key if I modify the function to accept it? No, it maps manually.
-    
-    // Let's just do the DB update manually here for the cohort change to be safe, 
-    // OR rely on updateProfileInSupabase if I fix it.
-    // I will fix updateProfileInSupabase in a separate call to include cohort_id.
     
     await updateProfileInSupabase(updates);
 
@@ -230,6 +232,7 @@ export const TaskProvider = ({ children }) => {
       }
     };
     checkWeeklyReset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]); // Run when session is ready
 
   // Local Storage Backup (Legacy/Offline support)

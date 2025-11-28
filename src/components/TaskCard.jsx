@@ -2,18 +2,9 @@ import { useState } from 'react';
 import { useTask } from '../context/TaskContext';
 
 const TaskCard = ({ task }) => {
-  const { completeTask, deleteTask, toggleTask, editTask } = useTask();
+  const { toggleTask, deleteTask, editTask } = useTask();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
-
-  const handleComplete = (e) => {
-    e.stopPropagation();
-    if (!task.completed) {
-      completeTask(task.id);
-    } else {
-        toggleTask(task.id);
-    }
-  };
 
   const handleSaveEdit = (e) => {
     e.preventDefault();
