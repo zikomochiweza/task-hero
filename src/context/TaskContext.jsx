@@ -96,15 +96,17 @@ export const TaskProvider = ({ children }) => {
         }
 
         // Update local state
+        const completedTasksCount = data.completed_tasks || 0;
         setUser(prev => ({
             ...prev,
             name: data.name,
             email: data.email,
             xp: data.xp,
+            totalXp: completedTasksCount * 50, // Calculate total XP from completed tasks
             league: data.league,
             cohortId: cohortId,
             streak: data.streak,
-            completedTasks: data.completed_tasks || 0,
+            completedTasks: completedTasksCount,
             nightOwlCount: data.night_owl_count || 0,
             streak7Count: data.streak_7_count || 0,
             finalsWon: data.finals_won || 0,
@@ -275,9 +277,13 @@ export const TaskProvider = ({ children }) => {
       // Calculate new stats
       const newXp = user.xp + task.xpValue;
       const newCompletedTasks = user.completedTasks + 1;
+      const newTotalXp = newCompletedTasks * 50; // Update total XP
 
       // Update Supabase & Local State
       updateProfileInSupabase({ xp: newXp, completedTasks: newCompletedTasks });
+      
+      // Optimistically update totalXp in local state
+      setUser(prev => ({ ...prev, totalXp: newTotalXp }));
 
       // Update Task Status
       setTasks(prev => prev.map(t => 
@@ -307,8 +313,12 @@ export const TaskProvider = ({ children }) => {
       // Un-completing (Revert XP)
       const newXp = Math.max(0, user.xp - 50);
       const newCompletedTasks = Math.max(0, user.completedTasks - 1);
+      const newTotalXp = newCompletedTasks * 50; // Update total XP
       
       updateProfileInSupabase({ xp: newXp, completedTasks: newCompletedTasks });
+      
+      // Optimistically update totalXp in local state
+      setUser(prev => ({ ...prev, totalXp: newTotalXp }));
 
       setTasks(prev => prev.map(t => 
         t.id === id ? { ...t, completed: false } : t
