@@ -118,11 +118,21 @@ export const TaskProvider = ({ children }) => {
                 newStreak = 1;
             }
             
-            // Update DB with new streak and last_login
+            // --- ACHIEVEMENT: On Fire (7 Day Streak) ---
+            let newStreak7Count = data.streak_7_count || 0;
+            if (newStreak % 7 === 0 && newStreak > 0) {
+                newStreak7Count += 1;
+            }
+            
+            // Update DB with new streak, last_login, and achievement
             await supabase.from('profiles').update({ 
                 streak: newStreak,
-                last_login: today.toISOString()
+                last_login: today.toISOString(),
+                streak_7_count: newStreak7Count
             }).eq('id', authUser.id);
+            
+            // Update local state for streak achievement immediately
+            data.streak_7_count = newStreak7Count;
         }
         // --------------------
 
@@ -139,7 +149,7 @@ export const TaskProvider = ({ children }) => {
             streak: newStreak,
             completedTasks: completedTasksCount,
             nightOwlCount: data.night_owl_count || 0,
-            streak7Count: data.streak_7_count || 0,
+            streak7Count: data.streak_7_count || 0, // Use the updated count
             finalsWon: data.finals_won || 0,
             top3Finishes: data.top_3_finishes || 0
         }));
@@ -309,9 +319,22 @@ export const TaskProvider = ({ children }) => {
       const newXp = user.xp + task.xpValue;
       const newCompletedTasks = user.completedTasks + 1;
       const newTotalXp = newCompletedTasks * 50; // Update total XP
+      
+      // --- ACHIEVEMENT: Night Owl ---
+      const currentHour = new Date().getHours();
+      let newNightOwlCount = user.nightOwlCount;
+      // Check if between 10 PM (22) and 4 AM (4)
+      if (currentHour >= 22 || currentHour < 4) {
+          newNightOwlCount += 1;
+      }
+      // ------------------------------
 
       // Update Supabase & Local State
-      updateProfileInSupabase({ xp: newXp, completedTasks: newCompletedTasks });
+      updateProfileInSupabase({ 
+          xp: newXp, 
+          completedTasks: newCompletedTasks,
+          nightOwlCount: newNightOwlCount 
+      });
       
       // Optimistically update totalXp in local state
       setUser(prev => ({ ...prev, totalXp: newTotalXp }));
