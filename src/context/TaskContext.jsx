@@ -95,6 +95,37 @@ export const TaskProvider = ({ children }) => {
             }
         }
 
+        // --- STREAK LOGIC ---
+        const today = new Date();
+        const lastLogin = new Date(data.last_login);
+        
+        // Reset time part to compare dates only (UTC)
+        const todayStr = today.toISOString().split('T')[0];
+        const lastLoginStr = lastLogin.toISOString().split('T')[0];
+        
+        let newStreak = data.streak;
+        
+        // Calculate difference in days
+        const diffTime = Math.abs(new Date(todayStr) - new Date(lastLoginStr));
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (todayStr !== lastLoginStr) {
+            if (diffDays === 1) {
+                // Logged in yesterday -> Increment streak
+                newStreak += 1;
+            } else {
+                // Missed a day (or more) -> Reset streak
+                newStreak = 1;
+            }
+            
+            // Update DB with new streak and last_login
+            await supabase.from('profiles').update({ 
+                streak: newStreak,
+                last_login: today.toISOString()
+            }).eq('id', authUser.id);
+        }
+        // --------------------
+
         // Update local state
         const completedTasksCount = data.completed_tasks || 0;
         setUser(prev => ({
@@ -105,7 +136,7 @@ export const TaskProvider = ({ children }) => {
             totalXp: completedTasksCount * 50, // Calculate total XP from completed tasks
             league: data.league,
             cohortId: cohortId,
-            streak: data.streak,
+            streak: newStreak,
             completedTasks: completedTasksCount,
             nightOwlCount: data.night_owl_count || 0,
             streak7Count: data.streak_7_count || 0,
