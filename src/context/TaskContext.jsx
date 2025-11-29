@@ -30,6 +30,7 @@ export const TaskProvider = ({ children }) => {
     top3Finishes: 0,
     finalsWon: 0,
     nightOwlCount: 0,
+    earlyBirdCount: 0,
     streak7Count: 0,
     name: 'TaskHero User',
     email: 'user@taskhero.app'
@@ -74,6 +75,7 @@ export const TaskProvider = ({ children }) => {
           streak: 1,
           last_login: new Date().toISOString(),
           night_owl_count: 0,
+          early_bird_count: 0,
           streak_7_count: 0,
           finals_won: 0,
           top_3_finishes: 0
@@ -150,6 +152,7 @@ export const TaskProvider = ({ children }) => {
             streak: newStreak,
             completedTasks: completedTasksCount,
             nightOwlCount: data.night_owl_count || 0,
+            earlyBirdCount: data.early_bird_count || 0,
             streak7Count: data.streak_7_count || 0, // Use the updated count
             finalsWon: data.finals_won || 0,
             top3Finishes: data.top_3_finishes || 0
@@ -180,6 +183,7 @@ export const TaskProvider = ({ children }) => {
         completed_tasks: updates.completedTasks !== undefined ? updates.completedTasks : user.completedTasks,
         streak: updates.streak !== undefined ? updates.streak : user.streak,
         night_owl_count: updates.nightOwlCount !== undefined ? updates.nightOwlCount : user.nightOwlCount,
+        early_bird_count: updates.earlyBirdCount !== undefined ? updates.earlyBirdCount : user.earlyBirdCount,
         streak_7_count: updates.streak7Count !== undefined ? updates.streak7Count : user.streak7Count,
         finals_won: updates.finalsWon !== undefined ? updates.finalsWon : user.finalsWon,
         top_3_finishes: updates.top3Finishes !== undefined ? updates.top3Finishes : user.top3Finishes,
@@ -337,13 +341,22 @@ export const TaskProvider = ({ children }) => {
           newNightOwlCount += 1;
           setHasNewAchievement(true); // Notify user
       }
+      
+      // --- ACHIEVEMENT: Early Bird ---
+      let newEarlyBirdCount = user.earlyBirdCount;
+      // Check if between 5 AM (5) and 9 AM (9)
+      if (currentHour >= 5 && currentHour < 9) {
+          newEarlyBirdCount += 1;
+          setHasNewAchievement(true); // Notify user
+      }
       // ------------------------------
 
       // Update Supabase & Local State
       updateProfileInSupabase({ 
           xp: newXp, 
           completedTasks: newCompletedTasks,
-          nightOwlCount: newNightOwlCount 
+          nightOwlCount: newNightOwlCount,
+          earlyBirdCount: newEarlyBirdCount
       });
       
       // Optimistically update totalXp in local state

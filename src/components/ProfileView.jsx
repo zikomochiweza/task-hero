@@ -17,6 +17,7 @@ const ProfileView = () => {
     { id: 4, icon: '💯', title: 'Centurion', desc: '100 Tasks Done', unlocked: user.completedTasks >= 100, count: Math.floor(user.completedTasks / 100) },
     { id: 5, icon: '🌙', title: 'Night Owl', desc: 'Login after 10PM', unlocked: user.nightOwlCount > 0, count: user.nightOwlCount },
     { id: 6, icon: '💎', title: 'Diamond', desc: 'Reach Diamond League', unlocked: user.league === 'Diamond', count: user.league === 'Diamond' ? 1 : 0 },
+    { id: 7, icon: '🌅', title: 'Early Bird', desc: 'Task 5AM-9AM', unlocked: user.earlyBirdCount > 0, count: user.earlyBirdCount },
   ];
 
   return (
