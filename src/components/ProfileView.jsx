@@ -1,7 +1,13 @@
+import { useEffect } from 'react';
 import { useTask } from '../context/TaskContext';
 
 const ProfileView = () => {
-  const { user } = useTask();
+  const { user, clearAchievementNotification } = useTask();
+
+  // Clear notification when viewing profile
+  useEffect(() => {
+      clearAchievementNotification();
+  }, []);
 
   // List of achievements with unlock conditions
   const achievements = [

@@ -4,8 +4,13 @@ import { supabase } from '../supabaseClient';
 import { getLeagueThresholds } from '../data/mockData';
 
 const LeagueView = () => {
-  const { user } = useTask();
+  const { user, clearLeagueNotification } = useTask();
   const [leagueUsers, setLeagueUsers] = useState([]);
+  
+  // Clear notification when viewing league
+  useEffect(() => {
+      clearLeagueNotification();
+  }, []);
   
   // Fetch Leaderboard Data
   useEffect(() => {

@@ -122,6 +122,7 @@ export const TaskProvider = ({ children }) => {
             let newStreak7Count = data.streak_7_count || 0;
             if (newStreak % 7 === 0 && newStreak > 0) {
                 newStreak7Count += 1;
+                setHasNewAchievement(true); // Notify user
             }
             
             // Update DB with new streak, last_login, and achievement
@@ -158,6 +159,13 @@ export const TaskProvider = ({ children }) => {
       console.error('Error fetching profile:', error);
     }
   };
+
+  // Notification State
+  const [hasNewAchievement, setHasNewAchievement] = useState(false);
+  const [hasLeagueUpdate, setHasLeagueUpdate] = useState(false);
+
+  const clearAchievementNotification = () => setHasNewAchievement(false);
+  const clearLeagueNotification = () => setHasLeagueUpdate(false);
 
   // 3. Sync XP Updates to Supabase
   const updateProfileInSupabase = async (updates) => {
@@ -246,6 +254,7 @@ export const TaskProvider = ({ children }) => {
     const currentWeek = getWeekNumber(today);
     localStorage.setItem('taskquest_last_league_update', JSON.stringify({ week: currentWeek, year: today.getFullYear() }));
     
+    setHasLeagueUpdate(true); // Notify user of league update
     setMotivation(notification);
     setTimeout(() => setMotivation(null), 5000);
   };
@@ -326,6 +335,7 @@ export const TaskProvider = ({ children }) => {
       // Check if between 10 PM (22) and 4 AM (4)
       if (currentHour >= 22 || currentHour < 4) {
           newNightOwlCount += 1;
+          setHasNewAchievement(true); // Notify user
       }
       // ------------------------------
 
@@ -381,7 +391,10 @@ export const TaskProvider = ({ children }) => {
   };
 
   return (
-    <TaskContext.Provider value={{ session, tasks, user, addTask, deleteTask, toggleTask, completeTask, editTask, motivation }}>
+    <TaskContext.Provider value={{ 
+        session, tasks, user, addTask, deleteTask, toggleTask, completeTask, editTask, motivation,
+        hasNewAchievement, hasLeagueUpdate, clearAchievementNotification, clearLeagueNotification
+    }}>
       {children}
     </TaskContext.Provider>
   );

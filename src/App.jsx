@@ -40,14 +40,19 @@ function AppContent() {
   };
 
   // Helper component for Mobile Navigation Items
-  const NavItem = ({ view, icon, label }) => (
+  const NavItem = ({ view, icon, label, hasNotification }) => (
     <button
       onClick={() => setCurrentView(view)}
-      className={`flex flex-col items-center justify-center w-full py-3 transition-colors ${
+      className={`flex flex-col items-center justify-center w-full py-3 transition-colors relative ${
         currentView === view ? 'text-gold' : 'text-gray-500 hover:text-gray-300 dark:text-gray-500 dark:hover:text-gray-300'
       }`}
     >
-      <span className="text-2xl mb-1">{icon}</span>
+      <div className="relative">
+        <span className="text-2xl mb-1">{icon}</span>
+        {hasNotification && (
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-dark-800"></span>
+        )}
+      </div>
       <span className="text-xs font-medium">{label}</span>
     </button>
   );
@@ -77,6 +82,9 @@ function AppContent() {
     return <Login />;
   }
 
+  // Get notification states
+  const { hasNewAchievement, hasLeagueUpdate } = useTask();
+
   return (
     <div className={`min-h-screen font-sans transition-colors duration-300 ${isDark ? 'bg-dark-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
       {/* Main Content Area */}
@@ -87,8 +95,8 @@ function AppContent() {
       {/* Mobile Bottom Navigation */}
       <nav className={`md:hidden fixed bottom-0 left-0 right-0 border-t flex justify-around z-50 pb-4 pt-2 ${isDark ? 'bg-dark-800 border-dark-700' : 'bg-white border-gray-200'}`}>
         <NavItem view="dashboard" icon="📝" label="Tasks" />
-        <NavItem view="league" icon="🏆" label="League" />
-        <NavItem view="profile" icon="👤" label="Profile" />
+        <NavItem view="league" icon="🏆" label="League" hasNotification={hasLeagueUpdate} />
+        <NavItem view="profile" icon="👤" label="Profile" hasNotification={hasNewAchievement} />
       </nav>
 
       {/* Desktop Sidebar Navigation */}
@@ -101,24 +109,33 @@ function AppContent() {
         </div>
 
         <nav className="space-y-2">
-          {['dashboard', 'league', 'profile'].map(view => (
-            <button
-              key={view}
-              onClick={() => setCurrentView(view)}
-              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all capitalize ${
-                currentView === view 
-                  ? 'bg-gold text-dark-900 font-bold' 
-                  : isDark ? 'text-gray-400 hover:bg-dark-700' : 'text-gray-500 hover:bg-gray-100'
-              }`}
-            >
-              <span>
-                {view === 'dashboard' && '📝'}
-                {view === 'league' && '🏆'}
-                {view === 'profile' && '👤'}
-              </span>
-              {view}
-            </button>
-          ))}
+          {['dashboard', 'league', 'profile'].map(view => {
+            const showDot = (view === 'league' && hasLeagueUpdate) || (view === 'profile' && hasNewAchievement);
+            
+            return (
+                <button
+                key={view}
+                onClick={() => setCurrentView(view)}
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all capitalize relative ${
+                    currentView === view 
+                    ? 'bg-gold text-dark-900 font-bold' 
+                    : isDark ? 'text-gray-400 hover:bg-dark-700' : 'text-gray-500 hover:bg-gray-100'
+                }`}
+                >
+                <div className="relative">
+                    <span>
+                        {view === 'dashboard' && '📝'}
+                        {view === 'league' && '🏆'}
+                        {view === 'profile' && '👤'}
+                    </span>
+                    {showDot && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-dark-800"></span>
+                    )}
+                </div>
+                {view}
+                </button>
+            );
+          })}
         </nav>
 
         <div className="mt-auto pt-6 border-t border-dark-700">
