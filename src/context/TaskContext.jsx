@@ -158,6 +158,7 @@ export const TaskProvider = ({ children }) => {
             top3Finishes: data.top_3_finishes || 0
         }));
       }
+      setIsProfileLoaded(true); // Profile is fully loaded
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
@@ -166,6 +167,8 @@ export const TaskProvider = ({ children }) => {
   // Notification State
   const [hasNewAchievement, setHasNewAchievement] = useState(false);
   const [hasLeagueUpdate, setHasLeagueUpdate] = useState(false);
+  // Loading State to prevent race conditions
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
 
   const clearAchievementNotification = () => setHasNewAchievement(false);
   const clearLeagueNotification = () => setHasLeagueUpdate(false);
@@ -272,7 +275,7 @@ export const TaskProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (!session?.user) return; // Wait for login
+    if (!session?.user || !isProfileLoaded) return; // Wait for login AND profile load
 
     const checkWeeklyReset = () => {
       const lastUpdate = localStorage.getItem('taskquest_last_league_update');
@@ -289,7 +292,7 @@ export const TaskProvider = ({ children }) => {
     };
     checkWeeklyReset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]); // Run when session is ready
+  }, [session, isProfileLoaded]); // Run when session OR profile loaded status changes
 
   // Local Storage Backup (Legacy/Offline support)
   useEffect(() => {
