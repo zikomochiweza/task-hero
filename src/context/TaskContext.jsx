@@ -111,6 +111,8 @@ export const TaskProvider = ({ children }) => {
         const diffTime = Math.abs(new Date(todayStr) - new Date(lastLoginStr));
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
+        let shouldUpdate = false;
+
         if (todayStr !== lastLoginStr) {
             if (diffDays === 1) {
                 // Logged in yesterday -> Increment streak
@@ -119,7 +121,14 @@ export const TaskProvider = ({ children }) => {
                 // Missed a day (or more) -> Reset streak
                 newStreak = 1;
             }
+            shouldUpdate = true;
+        } else if (data.streak < 1) {
+            // Same day, but streak is 0 (should be 1)
+            newStreak = 1;
+            shouldUpdate = true;
+        }
             
+        if (shouldUpdate) {
             // --- ACHIEVEMENT: On Fire (7 Day Streak) ---
             let newStreak7Count = data.streak_7_count || 0;
             if (newStreak % 7 === 0 && newStreak > 0) {
