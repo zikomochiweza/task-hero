@@ -29,8 +29,8 @@ const Dashboard = () => {
         {/* Total XP Card */}
         <div className="bg-white dark:bg-dark-800 p-5 rounded-3xl shadow-sm border border-gray-100 dark:border-dark-700 flex justify-between items-center transition-transform hover:scale-[1.02]">
           <div>
-            <div className="text-gray-600 dark:text-gray-400 text-sm font-bold mb-1">Total XP</div>
-            <div className="text-3xl font-black text-blue-600 dark:text-blue-400">{user.totalXp || 0}</div>
+            <div className="text-gray-600 dark:text-gray-400 text-sm font-bold mb-1">League XP</div>
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400">{user.xp || 0}</div>
           </div>
           <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/20 rounded-2xl flex items-center justify-center text-2xl">
             ⚡

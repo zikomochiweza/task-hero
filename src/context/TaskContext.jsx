@@ -174,6 +174,7 @@ export const TaskProvider = ({ children }) => {
   const clearLeagueNotification = () => setHasLeagueUpdate(false);
 
   // 3. Sync XP Updates to Supabase
+  // 3. Sync XP Updates to Supabase
   const updateProfileInSupabase = async (updates) => {
     if (!session?.user) return;
     
@@ -181,18 +182,17 @@ export const TaskProvider = ({ children }) => {
     setUser(prev => ({ ...prev, ...updates }));
 
     // Map local camelCase to DB snake_case
-    const dbUpdates = {
-        xp: updates.xp !== undefined ? updates.xp : user.xp,
-        completed_tasks: updates.completedTasks !== undefined ? updates.completedTasks : user.completedTasks,
-        streak: updates.streak !== undefined ? updates.streak : user.streak,
-        night_owl_count: updates.nightOwlCount !== undefined ? updates.nightOwlCount : user.nightOwlCount,
-        early_bird_count: updates.earlyBirdCount !== undefined ? updates.earlyBirdCount : user.earlyBirdCount,
-        streak_7_count: updates.streak7Count !== undefined ? updates.streak7Count : user.streak7Count,
-        finals_won: updates.finalsWon !== undefined ? updates.finalsWon : user.finalsWon,
-        top_3_finishes: updates.top3Finishes !== undefined ? updates.top3Finishes : user.top3Finishes,
-        league: updates.league !== undefined ? updates.league : user.league,
-        cohort_id: updates.cohortId !== undefined ? updates.cohortId : user.cohortId
-    };
+    const dbUpdates = {};
+    if (updates.xp !== undefined) dbUpdates.xp = updates.xp;
+    if (updates.completedTasks !== undefined) dbUpdates.completed_tasks = updates.completedTasks;
+    if (updates.streak !== undefined) dbUpdates.streak = updates.streak;
+    if (updates.nightOwlCount !== undefined) dbUpdates.night_owl_count = updates.nightOwlCount;
+    if (updates.earlyBirdCount !== undefined) dbUpdates.early_bird_count = updates.earlyBirdCount;
+    if (updates.streak7Count !== undefined) dbUpdates.streak_7_count = updates.streak7Count;
+    if (updates.finalsWon !== undefined) dbUpdates.finals_won = updates.finalsWon;
+    if (updates.top3Finishes !== undefined) dbUpdates.top_3_finishes = updates.top3Finishes;
+    if (updates.league !== undefined) dbUpdates.league = updates.league;
+    if (updates.cohortId !== undefined) dbUpdates.cohort_id = updates.cohortId;
 
     // DB Update
     const { error } = await supabase
