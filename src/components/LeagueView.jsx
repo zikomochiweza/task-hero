@@ -115,10 +115,14 @@ const LeagueView = () => {
                 </span>
                 
                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold overflow-hidden
                         ${isMe ? 'bg-white text-blue-600' : 'bg-gray-100 dark:bg-dark-700 text-gray-600'}
                     `}>
-                        {u.name.charAt(0)}
+                        {u.avatar_url ? (
+                            <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
+                        ) : (
+                            u.name.charAt(0)
+                        )}
                     </div>
                     <div>
                         <div className={`font-bold text-sm ${isMe ? 'text-white' : 'text-gray-800 dark:text-white'}`}>
