@@ -60,7 +60,7 @@ const ImageCropper = ({ imageSrc, onCropComplete, onCancel }) => {
     return new Promise((resolve, reject) => {
       canvas.toBlob((file) => {
         resolve(file);
-      }, 'image/jpeg');
+      }, 'image/jpeg', 0.7);
     });
   };
 
