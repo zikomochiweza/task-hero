@@ -492,7 +492,7 @@ export const TaskProvider = ({ children }) => {
     "Leveling up, one task at a time! 📈"
   ];
 
-  const completeTask = (id, proofUrl = null) => {
+  const completeTask = async (id, proofUrl = null) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
@@ -539,7 +539,7 @@ export const TaskProvider = ({ children }) => {
       // ------------------------------
 
       // Update Supabase & Local State
-      updateProfileInSupabase({ 
+      await updateProfileInSupabase({ 
           xp: newXp, 
           completedTasks: newCompletedTasks,
           nightOwlCount: newNightOwlCount,
@@ -554,9 +554,8 @@ export const TaskProvider = ({ children }) => {
       const updateData = { completed: true };
       if (proofUrl) updateData.proof_url = proofUrl;
 
-      supabase.from('tasks').update(updateData).eq('id', id).then(({ error }) => {
-          if (error) console.error('Error completing task:', error);
-      });
+      const { error: taskError } = await supabase.from('tasks').update(updateData).eq('id', id);
+      if (taskError) console.error('Error completing task:', taskError);
 
       // Trigger Motivation
       const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];

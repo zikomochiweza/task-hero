@@ -61,38 +61,27 @@ const TaskCard = ({ task }) => {
       <div className="flex items-center gap-4">
         {/* Checkbox */}
         {/* Checkbox / Proof Button */}
+        {/* Camera Button (Primary Action) */}
         <div className="relative">
-            <button
-            onClick={() => {
-                if (isCompleted) {
-                    toggleTask(task.id);
-                } else {
-                    // Toggle proof upload visibility or just complete if user prefers simple check (maybe long press? for now let's just show a small menu or separate button)
-                    // For simplicity: Click checks it (no proof), but we add a small camera icon for proof.
-                    toggleTask(task.id);
-                }
-            }}
-            className={`
-                w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300
-                ${isCompleted 
-                ? 'bg-green-500 border-green-500 text-white scale-110' 
-                : 'border-gray-300 dark:border-gray-600 text-transparent hover:border-green-500'}
-            `}
+            <label 
+                htmlFor={`proof-upload-${task.id}`}
+                className={`
+                    w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 cursor-pointer shadow-sm
+                    ${isCompleted 
+                    ? 'bg-green-500 text-white scale-105 shadow-green-500/30' 
+                    : 'bg-gray-100 dark:bg-dark-700 text-gray-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900/20'}
+                    ${uploading ? 'animate-pulse' : ''}
+                `}
+                title={isCompleted ? "Update Proof" : "Upload Proof to Complete"}
             >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            </button>
-            
-            {(!isCompleted || !task.proofUrl) && (
-                 <label 
-                    htmlFor={`proof-upload-${task.id}`}
-                    className={`absolute -right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 cursor-pointer transition-colors ${uploading ? 'animate-pulse' : ''}`}
-                    title={isCompleted ? "Add Proof" : "Complete with Proof"}
-                 >
-                     {uploading ? '⏳' : '📷'}
-                 </label>
-            )}
+                {isCompleted ? (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                ) : (
+                    <span className="text-xl">{uploading ? '⏳' : '📷'}</span>
+                )}
+            </label>
         </div>
 
         {/* Content */}

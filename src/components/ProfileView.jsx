@@ -57,7 +57,9 @@ const ProfileView = () => {
 
                                     const file = e.target.files[0];
                                     const fileExt = file.name.split('.').pop();
-                                    const fileName = `${user.email}-${Math.random()}.${fileExt}`;
+                                    // Sanitize filename: remove special chars from email, use timestamp
+                                    const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '');
+                                    const fileName = `${sanitizedEmail}-${Date.now()}.${fileExt}`;
                                     const filePath = `${fileName}`;
 
                                     const { error: uploadError } = await supabase.storage
