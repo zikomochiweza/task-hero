@@ -519,7 +519,7 @@ export const TaskProvider = ({ children }) => {
       const currentXp = user.xp || 0;
       const currentCompletedTasks = user.completedTasks || 0;
       
-      const newXp = currentXp + task.xpValue;
+      const newXp = currentXp + (task.xp_value || 50);
       const newCompletedTasks = currentCompletedTasks + 1;
       const newTotalXp = newCompletedTasks * 50; // Update total XP
       
