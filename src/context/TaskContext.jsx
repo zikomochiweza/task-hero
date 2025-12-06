@@ -30,7 +30,6 @@ export const TaskProvider = ({ children }) => {
     earlyBirdCount: 0,
     streak7Count: 0,
     name: 'TaskHero User',
-    name: 'TaskHero User',
     email: 'user@taskhero.app',
     avatarUrl: null
   });
@@ -264,12 +263,22 @@ export const TaskProvider = ({ children }) => {
     };
 
     // Run check once on load (if appropriate time)
-    checkStatus();
+    try {
+        checkStatus();
+    } catch (e) {
+        console.error("Error in notification check:", e);
+    }
     
     // Set interval to check every hour
-    const interval = setInterval(checkStatus, 1000 * 60 * 60);
+    const interval = setInterval(() => {
+        try {
+            checkStatus();
+        } catch (e) {
+            console.error("Error in notification interval:", e);
+        }
+    }, 1000 * 60 * 60);
     return () => clearInterval(interval);
-  }, [isProfileLoaded, user.streak]);
+  }, [isProfileLoaded, user.streak, tasks]); // Added tasks to dependency
 
   // Real-time League Monitoring (Overtaken)
   useEffect(() => {
@@ -485,7 +494,27 @@ export const TaskProvider = ({ children }) => {
 
   const completeTask = (id, proofUrl = null) => {
     const task = tasks.find(t => t.id === id);
-    if (task && !task.completed) {
+    if (!task) return;
+
+    // Case 1: Task is already completed, just adding proof
+    if (task.completed && proofUrl) {
+        // Update local state
+        setTasks(prev => prev.map(t => 
+            t.id === id ? { ...t, proofUrl: proofUrl } : t
+        ));
+        
+        // Update Supabase
+        supabase.from('tasks').update({ proof_url: proofUrl }).eq('id', id).then(({ error }) => {
+            if (error) console.error('Error adding proof:', error);
+        });
+
+        setMotivation("Proof added! 📸");
+        setTimeout(() => setMotivation(null), 3000);
+        return;
+    }
+
+    // Case 2: Completing the task for the first time
+    if (!task.completed) {
       // Calculate new stats
       const newXp = user.xp + task.xpValue;
       const newCompletedTasks = user.completedTasks + 1;

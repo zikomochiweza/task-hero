@@ -84,14 +84,14 @@ const TaskCard = ({ task }) => {
             </svg>
             </button>
             
-            {!isCompleted && (
-                 <button 
-                    onClick={() => setShowProofUpload(!showProofUpload)}
-                    className="absolute -right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500"
-                    title="Complete with Proof"
+            {(!isCompleted || !task.proofUrl) && (
+                 <label 
+                    htmlFor={`proof-upload-${task.id}`}
+                    className={`absolute -right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 cursor-pointer transition-colors ${uploading ? 'animate-pulse' : ''}`}
+                    title={isCompleted ? "Add Proof" : "Complete with Proof"}
                  >
-                     📷
-                 </button>
+                     {uploading ? '⏳' : '📷'}
+                 </label>
             )}
         </div>
 
@@ -122,20 +122,15 @@ const TaskCard = ({ task }) => {
                     </a>
                 )}
                 
-                {/* Proof Upload UI */}
-                {showProofUpload && !isCompleted && (
-                    <div className="mt-2 p-2 bg-gray-50 dark:bg-dark-900 rounded-lg border border-gray-200 dark:border-dark-700 animate-in fade-in slide-in-from-top-2">
-                        <p className="text-xs text-gray-500 mb-2">Upload proof to complete:</p>
-                        <input 
-                            type="file" 
-                            accept="image/*"
-                            onChange={handleProofUpload}
-                            disabled={uploading}
-                            className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
-                        {uploading && <span className="text-xs text-blue-500 ml-2">Uploading...</span>}
-                    </div>
-                )}
+                {/* Hidden File Input for Seamless Upload */}
+                <input 
+                    type="file" 
+                    id={`proof-upload-${task.id}`}
+                    accept="image/*"
+                    onChange={handleProofUpload}
+                    disabled={uploading}
+                    className="hidden"
+                />
             </div>
           )}
         </div>
