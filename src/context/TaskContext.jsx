@@ -515,9 +515,12 @@ export const TaskProvider = ({ children }) => {
 
     // Case 2: Completing the task for the first time
     if (!task.completed) {
-      // Calculate new stats
-      const newXp = user.xp + task.xpValue;
-      const newCompletedTasks = user.completedTasks + 1;
+      // Calculate new stats (Handle NULL XP)
+      const currentXp = user.xp || 0;
+      const currentCompletedTasks = user.completedTasks || 0;
+      
+      const newXp = currentXp + task.xpValue;
+      const newCompletedTasks = currentCompletedTasks + 1;
       const newTotalXp = newCompletedTasks * 50; // Update total XP
       
       // --- ACHIEVEMENT: Night Owl ---
@@ -538,19 +541,31 @@ export const TaskProvider = ({ children }) => {
       }
       // ------------------------------
 
-      // Update Supabase & Local State
+      // 1. Optimistic UI Updates
+      // Update User Stats
+      setUser(prev => ({ 
+          ...prev, 
+          xp: newXp,
+          completedTasks: newCompletedTasks,
+          totalXp: newTotalXp,
+          nightOwlCount: newNightOwlCount,
+          earlyBirdCount: newEarlyBirdCount
+      }));
+
+      // Update Tasks List (Move to completed)
+      setTasks(prev => prev.map(t => 
+          t.id === id ? { ...t, completed: true, proofUrl: proofUrl || t.proofUrl } : t
+      ));
+
+      // 2. Update Supabase Profile
       await updateProfileInSupabase({ 
           xp: newXp, 
           completedTasks: newCompletedTasks,
           nightOwlCount: newNightOwlCount,
           earlyBirdCount: newEarlyBirdCount
       });
-      
-      // Optimistically update totalXp in local state
-      setUser(prev => ({ ...prev, totalXp: newTotalXp }));
 
-      // Update Task Status in Supabase
-      // We do this AFTER the profile update logic to ensure UI feels fast
+      // 3. Update Task in Supabase
       const updateData = { completed: true };
       if (proofUrl) updateData.proof_url = proofUrl;
 

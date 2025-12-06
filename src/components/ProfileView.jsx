@@ -3,16 +3,56 @@ import { useTask } from '../context/TaskContext';
 import { supabase } from '../supabaseClient';
 import { useState } from 'react';
 
+import ImageCropper from './ImageCropper';
+
 const ProfileView = () => {
   const { user, clearAchievementNotification, updateProfileInSupabase } = useTask();
   const [uploading, setUploading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   // Clear notification when viewing profile
   useEffect(() => {
       clearAchievementNotification();
   }, []);
 
-  // List of achievements with unlock conditions
+  const handleFileSelect = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.addEventListener('load', () => setSelectedImage(reader.result));
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropComplete = async (croppedImageBlob) => {
+    try {
+        setUploading(true);
+        setSelectedImage(null); // Close cropper
+
+        const fileExt = 'jpg';
+        const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '');
+        const fileName = `${sanitizedEmail}-${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, croppedImageBlob);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+        await updateProfileInSupabase({ avatarUrl: publicUrl });
+    } catch (error) {
+        alert('Error uploading photo: ' + error.message);
+    } finally {
+        setUploading(false);
+    }
+  };
+
+  // ... achievements list ...
   const achievements = [
     { id: 1, icon: '🥉', title: 'Podium Finish', desc: 'Finish in Top 3', unlocked: user.top3Finishes > 0, count: user.top3Finishes },
     { id: 2, icon: '👑', title: 'Champion', desc: 'Win the Finals', unlocked: user.finalsWon > 0, count: user.finalsWon },
@@ -25,6 +65,13 @@ const ProfileView = () => {
 
   return (
     <div className="p-4 max-w-5xl mx-auto pb-24 space-y-6">
+      {selectedImage && (
+        <ImageCropper 
+            imageSrc={selectedImage} 
+            onCropComplete={handleCropComplete} 
+            onCancel={() => setSelectedImage(null)} 
+        />
+      )}
       
       {/* Top Section: User Card & Stats Grid - Responsive Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -62,34 +109,7 @@ const ProfileView = () => {
                         type="file" 
                         accept="image/*" 
                         className="hidden" 
-                        onChange={async (e) => {
-                            try {
-                                setUploading(true);
-                                if (!e.target.files || e.target.files.length === 0) return;
-
-                                const file = e.target.files[0];
-                                const fileExt = file.name.split('.').pop();
-                                const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '');
-                                const fileName = `${sanitizedEmail}-${Date.now()}.${fileExt}`;
-                                const filePath = `${fileName}`;
-
-                                const { error: uploadError } = await supabase.storage
-                                    .from('avatars')
-                                    .upload(filePath, file);
-
-                                if (uploadError) throw uploadError;
-
-                                const { data: { publicUrl } } = supabase.storage
-                                    .from('avatars')
-                                    .getPublicUrl(filePath);
-
-                                await updateProfileInSupabase({ avatarUrl: publicUrl });
-                            } catch (error) {
-                                alert('Error uploading photo: ' + error.message);
-                            } finally {
-                                setUploading(false);
-                            }
-                        }}
+                        onChange={handleFileSelect}
                         disabled={uploading}
                     />
                 </label>
