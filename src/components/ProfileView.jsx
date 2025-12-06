@@ -33,59 +33,66 @@ const ProfileView = () => {
         <div className="bg-white dark:bg-dark-800 rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100 dark:border-dark-700 flex flex-col items-center text-center relative overflow-hidden h-full justify-center">
             <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-blue-500 to-purple-500 opacity-10"></div>
             
-            <div className="w-28 h-28 rounded-full bg-white p-1.5 shadow-xl relative z-10 mb-4 group">
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-5xl text-white overflow-hidden relative">
-                    {user.avatarUrl ? (
-                        <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                        '👤'
-                    )}
-                    
-                    {/* Upload Overlay */}
-                    <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                        <span className="text-xs text-white font-bold">{uploading ? '...' : 'Change'}</span>
-                        <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={async (e) => {
-                                try {
-                                    setUploading(true);
-                                    if (!e.target.files || e.target.files.length === 0) {
-                                        throw new Error('You must select an image to upload.');
-                                    }
-
-                                    const file = e.target.files[0];
-                                    const fileExt = file.name.split('.').pop();
-                                    // Sanitize filename: remove special chars from email, use timestamp
-                                    const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '');
-                                    const fileName = `${sanitizedEmail}-${Date.now()}.${fileExt}`;
-                                    const filePath = `${fileName}`;
-
-                                    const { error: uploadError } = await supabase.storage
-                                        .from('avatars')
-                                        .upload(filePath, file);
-
-                                    if (uploadError) {
-                                        throw uploadError;
-                                    }
-
-                                    const { data: { publicUrl } } = supabase.storage
-                                        .from('avatars')
-                                        .getPublicUrl(filePath);
-
-                                    await updateProfileInSupabase({ avatarUrl: publicUrl });
-                                } catch (error) {
-                                    alert(error.message);
-                                } finally {
-                                    setUploading(false);
-                                }
-                            }}
-                            disabled={uploading}
-                        />
-                    </label>
+            <div className="relative mb-4 group">
+                <div className="w-28 h-28 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 p-1 shadow-xl relative z-10">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-white relative">
+                        {user.avatarUrl ? (
+                            <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-5xl">👤</div>
+                        )}
+                        
+                        {/* Loading Overlay */}
+                        {uploading && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
+                                <span className="text-white text-xs font-bold animate-pulse">Uploading...</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <div className="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>
+
+                {/* WhatsApp-style Camera Icon Button */}
+                <label className="absolute bottom-0 right-0 z-20 cursor-pointer transition-transform hover:scale-110 active:scale-95">
+                    <div className="bg-green-500 w-10 h-10 rounded-full border-4 border-white flex items-center justify-center shadow-md text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.414-1.414A1 1 0 0011.586 4H8.414a1 1 0 00-.707.293L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                        </svg>
+                    </div>
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={async (e) => {
+                            try {
+                                setUploading(true);
+                                if (!e.target.files || e.target.files.length === 0) return;
+
+                                const file = e.target.files[0];
+                                const fileExt = file.name.split('.').pop();
+                                const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '');
+                                const fileName = `${sanitizedEmail}-${Date.now()}.${fileExt}`;
+                                const filePath = `${fileName}`;
+
+                                const { error: uploadError } = await supabase.storage
+                                    .from('avatars')
+                                    .upload(filePath, file);
+
+                                if (uploadError) throw uploadError;
+
+                                const { data: { publicUrl } } = supabase.storage
+                                    .from('avatars')
+                                    .getPublicUrl(filePath);
+
+                                await updateProfileInSupabase({ avatarUrl: publicUrl });
+                            } catch (error) {
+                                alert('Error uploading photo: ' + error.message);
+                            } finally {
+                                setUploading(false);
+                            }
+                        }}
+                        disabled={uploading}
+                    />
+                </label>
             </div>
             
             <h2 className="text-2xl font-black text-gray-800 dark:text-white mb-1 relative z-10">{user.name}</h2>

@@ -28,7 +28,9 @@ const TaskCard = ({ task }) => {
 
         const file = e.target.files[0];
         const fileExt = file.name.split('.').pop();
-        const fileName = `${user.email}-${task.id}-${Math.random()}.${fileExt}`;
+        // Sanitize filename
+        const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '');
+        const fileName = `${sanitizedEmail}-${task.id}-${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
@@ -36,7 +38,8 @@ const TaskCard = ({ task }) => {
             .upload(filePath, file);
 
         if (uploadError) {
-            throw uploadError;
+            console.error('Upload error:', uploadError);
+            throw new Error('Failed to upload proof. Please try again.');
         }
 
         const { data: { publicUrl } } = supabase.storage
@@ -44,7 +47,7 @@ const TaskCard = ({ task }) => {
             .getPublicUrl(filePath);
 
         // Complete the task with proof
-        completeTask(task.id, publicUrl);
+        await completeTask(task.id, publicUrl);
         setShowProofUpload(false);
     } catch (error) {
         alert(error.message);
