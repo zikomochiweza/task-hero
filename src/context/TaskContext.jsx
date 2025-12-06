@@ -625,7 +625,8 @@ export const TaskProvider = ({ children }) => {
   return (
     <TaskContext.Provider value={{ 
         session, tasks, user, addTask, deleteTask, toggleTask, completeTask, editTask, motivation,
-        hasNewAchievement, hasLeagueUpdate, clearAchievementNotification, clearLeagueNotification
+        hasNewAchievement, hasLeagueUpdate, clearAchievementNotification, clearLeagueNotification,
+        updateProfileInSupabase
     }}>
       {children}
     </TaskContext.Provider>
