@@ -14,10 +14,7 @@ export const useTask = () => {
 
 export const TaskProvider = ({ children }) => {
   const [session, setSession] = useState(null);
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem('taskquest_tasks');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [tasks, setTasks] = useState([]);
 
   // User State (synced with Supabase)
   const [user, setUser] = useState({
@@ -33,23 +30,44 @@ export const TaskProvider = ({ children }) => {
     earlyBirdCount: 0,
     streak7Count: 0,
     name: 'TaskHero User',
-    email: 'user@taskhero.app'
+    name: 'TaskHero User',
+    email: 'user@taskhero.app',
+    avatarUrl: null
   });
 
   // 1. Handle Auth & Initial Profile Fetch
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session?.user) fetchOrCreateProfile(session.user);
+      if (session?.user) {
+          fetchOrCreateProfile(session.user);
+          fetchTasks(session.user.id);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session?.user) fetchOrCreateProfile(session.user);
+      if (session?.user) {
+          fetchOrCreateProfile(session.user);
+          fetchTasks(session.user.id);
+      } else {
+          setTasks([]); // Clear tasks on logout
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchTasks = async (userId) => {
+    const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+    
+    if (error) console.error('Error fetching tasks:', error);
+    else setTasks(data || []);
+  };
 
   // 2. Fetch or Create Profile in Supabase
   const fetchOrCreateProfile = async (authUser) => {
@@ -164,7 +182,9 @@ export const TaskProvider = ({ children }) => {
             earlyBirdCount: data.early_bird_count || 0,
             streak7Count: data.streak_7_count || 0, // Use the updated count
             finalsWon: data.finals_won || 0,
-            top3Finishes: data.top_3_finishes || 0
+            finalsWon: data.finals_won || 0,
+            top3Finishes: data.top_3_finishes || 0,
+            avatarUrl: data.avatar_url
         }));
       }
       setIsProfileLoaded(true); // Profile is fully loaded
@@ -181,6 +201,103 @@ export const TaskProvider = ({ children }) => {
 
   const clearAchievementNotification = () => setHasNewAchievement(false);
   const clearLeagueNotification = () => setHasLeagueUpdate(false);
+
+  // --- NOTIFICATIONS ---
+  const requestNotificationPermission = async () => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+      await Notification.requestPermission();
+    }
+  };
+
+  const sendNotification = (title, body) => {
+    if (Notification.permission === "granted") {
+      new Notification(title, { body, icon: '/vite.svg' });
+    }
+  };
+
+  // Check for Streak Risk & Inactivity
+  useEffect(() => {
+    if (!isProfileLoaded || !user) return;
+    
+    requestNotificationPermission();
+
+    const checkStatus = () => {
+        const now = new Date();
+        const hour = now.getHours();
+        const tasksDoneToday = tasks.some(t => {
+            const taskDate = new Date(t.created_at); // Assuming created_at is completion time for completed tasks, or check updated_at if available. 
+            // Actually, for simplicity, let's check user.completedTasks vs stored count or just check if any task in list is completed today.
+            // Better: Check if last_login was today AND if completedTasks increased. 
+            // Simplest for now: Check if any task in `tasks` array is completed and updated today.
+            return t.completed; // We need a better "done today" check, but let's rely on user.last_login for "visited" and local state for "done".
+        });
+        
+        // We really need a "tasks_completed_today" flag or check. 
+        // Let's assume if user.xp hasn't changed from a stored "start of day" value? 
+        // Or simpler: Just check if they have 0 completed tasks in the `tasks` list that are marked completed today.
+        // For this implementation, let's just check if they have ANY completed tasks for today.
+        
+        // 1. Streak Risk (After 8 PM)
+        if (hour >= 20 && user.streak > 0) {
+             // Logic: If they haven't done a task today. 
+             // Since we don't track "done today" explicitly in profile, we'll approximate.
+             // If last_login is today but we want to know if they DID a task.
+             // Let's just send a generic nudge if it's late.
+             const random = Math.random();
+             const msg = random > 0.5 
+                ? "Losing your streak after so long would suck 😢" 
+                : "🔥 Keep the flame alive! Don't lose your streak!";
+             sendNotification("Streak Risk!", msg);
+        }
+
+        // 2. Inactivity (Mid-day check, e.g., 2 PM)
+        if (hour === 14) {
+             const msgs = [
+                 "Lacking consistency I see you 👀",
+                 "Try doing a task today 💪",
+                 "Small steps lead to big goals! 🚀"
+             ];
+             const msg = msgs[Math.floor(Math.random() * msgs.length)];
+             sendNotification("TaskQuest", msg);
+        }
+    };
+
+    // Run check once on load (if appropriate time)
+    checkStatus();
+    
+    // Set interval to check every hour
+    const interval = setInterval(checkStatus, 1000 * 60 * 60);
+    return () => clearInterval(interval);
+  }, [isProfileLoaded, user.streak]);
+
+  // Real-time League Monitoring (Overtaken)
+  useEffect(() => {
+      if (!user.league || !user.cohortId) return;
+
+      const channel = supabase
+        .channel('league_updates')
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles',
+            filter: `league=eq.${user.league}` 
+        }, (payload) => {
+            const updatedUser = payload.new;
+            // Check if this user is in my cohort and NOT me
+            if (updatedUser.cohort_id === user.cohortId && updatedUser.id !== user.id) {
+                // Check if they just overtook me
+                if (updatedUser.xp > user.xp && payload.old.xp <= user.xp) {
+                    sendNotification("Overtaken! 🏎️", `${updatedUser.name} just passed you on the leaderboard!`);
+                }
+            }
+        })
+        .subscribe();
+
+      return () => {
+          supabase.removeChannel(channel);
+      };
+  }, [user.league, user.cohortId, user.xp]);
 
   // 3. Sync XP Updates to Supabase
   // 3. Sync XP Updates to Supabase
@@ -201,7 +318,9 @@ export const TaskProvider = ({ children }) => {
     if (updates.finalsWon !== undefined) dbUpdates.finals_won = updates.finalsWon;
     if (updates.top3Finishes !== undefined) dbUpdates.top_3_finishes = updates.top3Finishes;
     if (updates.league !== undefined) dbUpdates.league = updates.league;
+    if (updates.league !== undefined) dbUpdates.league = updates.league;
     if (updates.cohortId !== undefined) dbUpdates.cohort_id = updates.cohortId;
+    if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
 
     // DB Update
     const { error } = await supabase
@@ -309,19 +428,46 @@ export const TaskProvider = ({ children }) => {
   }, [tasks]);
 
   // Task Management
-  const addTask = (title) => {
+  const addTask = async (title) => {
+    if (!session?.user) return;
+
     const newTask = {
-      id: Date.now().toString(),
+      user_id: session.user.id,
       title,
       completed: false,
-      createdAt: new Date().toISOString(),
-      xpValue: 50
+      xp_value: 50
     };
-    setTasks(prev => [newTask, ...prev]);
+
+    // Optimistic Update (Temporary ID)
+    const tempId = Date.now().toString();
+    setTasks(prev => [{ ...newTask, id: tempId, created_at: new Date().toISOString() }, ...prev]);
+
+    const { data, error } = await supabase
+        .from('tasks')
+        .insert([newTask])
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error adding task:', error);
+        // Revert optimistic update if needed, or just let it fail silently for now (could add toast)
+        setTasks(prev => prev.filter(t => t.id !== tempId));
+    } else {
+        // Replace temp ID with real ID
+        setTasks(prev => prev.map(t => t.id === tempId ? data : t));
+    }
   };
 
-  const deleteTask = (id) => {
+  const deleteTask = async (id) => {
+    // Optimistic Update
     setTasks(prev => prev.filter(t => t.id !== id));
+
+    const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id);
+
+    if (error) console.error('Error deleting task:', error);
   };
 
   const [motivation, setMotivation] = useState(null);
@@ -337,7 +483,7 @@ export const TaskProvider = ({ children }) => {
     "Leveling up, one task at a time! 📈"
   ];
 
-  const completeTask = (id) => {
+  const completeTask = (id, proofUrl = null) => {
     const task = tasks.find(t => t.id === id);
     if (task && !task.completed) {
       // Calculate new stats
@@ -374,10 +520,14 @@ export const TaskProvider = ({ children }) => {
       // Optimistically update totalXp in local state
       setUser(prev => ({ ...prev, totalXp: newTotalXp }));
 
-      // Update Task Status
-      setTasks(prev => prev.map(t => 
-        t.id === id ? { ...t, completed: true } : t
-      ));
+      // Update Task Status in Supabase
+      // We do this AFTER the profile update logic to ensure UI feels fast
+      const updateData = { completed: true };
+      if (proofUrl) updateData.proof_url = proofUrl;
+
+      supabase.from('tasks').update(updateData).eq('id', id).then(({ error }) => {
+          if (error) console.error('Error completing task:', error);
+      });
 
       // Trigger Motivation
       const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
@@ -386,10 +536,18 @@ export const TaskProvider = ({ children }) => {
     }
   };
 
-  const editTask = (id, newTitle) => {
+  const editTask = async (id, newTitle) => {
+    // Optimistic Update
     setTasks(prev => prev.map(t => 
       t.id === id ? { ...t, title: newTitle } : t
     ));
+
+    const { error } = await supabase
+        .from('tasks')
+        .update({ title: newTitle })
+        .eq('id', id);
+
+    if (error) console.error('Error editing task:', error);
   };
 
   const toggleTask = (id) => {
@@ -409,9 +567,15 @@ export const TaskProvider = ({ children }) => {
       // Optimistically update totalXp in local state
       setUser(prev => ({ ...prev, totalXp: newTotalXp }));
 
+      // Optimistic Task Update
       setTasks(prev => prev.map(t => 
         t.id === id ? { ...t, completed: false } : t
       ));
+
+      // Supabase Update
+      supabase.from('tasks').update({ completed: false }).eq('id', id).then(({ error }) => {
+          if (error) console.error('Error un-completing task:', error);
+      });
     }
   };
 

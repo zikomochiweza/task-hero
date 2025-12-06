@@ -1,10 +1,13 @@
+import { supabase } from '../supabaseClient';
 import { useState } from 'react';
 import { useTask } from '../context/TaskContext';
 
 const TaskCard = ({ task }) => {
-  const { toggleTask, deleteTask, editTask } = useTask();
+  const { toggleTask, deleteTask, editTask, completeTask, user } = useTask();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
+  const [uploading, setUploading] = useState(false);
+  const [showProofUpload, setShowProofUpload] = useState(false);
 
   const handleSaveEdit = (e) => {
     e.preventDefault();
@@ -16,6 +19,40 @@ const TaskCard = ({ task }) => {
 
   const isCompleted = task.completed;
 
+  const handleProofUpload = async (e) => {
+    try {
+        setUploading(true);
+        if (!e.target.files || e.target.files.length === 0) {
+            throw new Error('You must select an image to upload.');
+        }
+
+        const file = e.target.files[0];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.email}-${task.id}-${Math.random()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('task-proofs')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            throw uploadError;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('task-proofs')
+            .getPublicUrl(filePath);
+
+        // Complete the task with proof
+        completeTask(task.id, publicUrl);
+        setShowProofUpload(false);
+    } catch (error) {
+        alert(error.message);
+    } finally {
+        setUploading(false);
+    }
+  };
+
   return (
     <div className={`
       group bg-white dark:bg-dark-800 p-4 rounded-2xl border border-gray-100 dark:border-dark-700 shadow-sm transition-all
@@ -23,19 +60,40 @@ const TaskCard = ({ task }) => {
     `}>
       <div className="flex items-center gap-4">
         {/* Checkbox */}
-        <button
-          onClick={() => toggleTask(task.id)}
-          className={`
-            w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300
-            ${isCompleted 
-              ? 'bg-green-500 border-green-500 text-white scale-110' 
-              : 'border-gray-300 dark:border-gray-600 text-transparent hover:border-green-500'}
-          `}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </button>
+        {/* Checkbox / Proof Button */}
+        <div className="relative">
+            <button
+            onClick={() => {
+                if (isCompleted) {
+                    toggleTask(task.id);
+                } else {
+                    // Toggle proof upload visibility or just complete if user prefers simple check (maybe long press? for now let's just show a small menu or separate button)
+                    // For simplicity: Click checks it (no proof), but we add a small camera icon for proof.
+                    toggleTask(task.id);
+                }
+            }}
+            className={`
+                w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300
+                ${isCompleted 
+                ? 'bg-green-500 border-green-500 text-white scale-110' 
+                : 'border-gray-300 dark:border-gray-600 text-transparent hover:border-green-500'}
+            `}
+            >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            </button>
+            
+            {!isCompleted && (
+                 <button 
+                    onClick={() => setShowProofUpload(!showProofUpload)}
+                    className="absolute -right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500"
+                    title="Complete with Proof"
+                 >
+                     📷
+                 </button>
+            )}
+        </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -51,11 +109,33 @@ const TaskCard = ({ task }) => {
               />
             </form>
           ) : (
-            <div 
-              className={`text-base font-medium truncate transition-all cursor-pointer select-none ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}
-              onDoubleClick={() => setIsEditing(true)}
-            >
-              {task.title}
+            <div className="flex flex-col">
+                <div 
+                className={`text-base font-medium truncate transition-all cursor-pointer select-none ${isCompleted ? 'text-gray-400 line-through' : 'text-gray-800 dark:text-gray-200'}`}
+                onDoubleClick={() => setIsEditing(true)}
+                >
+                {task.title}
+                </div>
+                {task.proofUrl && (
+                    <a href={task.proofUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1 mt-1">
+                        <span>📎</span> View Proof
+                    </a>
+                )}
+                
+                {/* Proof Upload UI */}
+                {showProofUpload && !isCompleted && (
+                    <div className="mt-2 p-2 bg-gray-50 dark:bg-dark-900 rounded-lg border border-gray-200 dark:border-dark-700 animate-in fade-in slide-in-from-top-2">
+                        <p className="text-xs text-gray-500 mb-2">Upload proof to complete:</p>
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleProofUpload}
+                            disabled={uploading}
+                            className="text-xs w-full file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        {uploading && <span className="text-xs text-blue-500 ml-2">Uploading...</span>}
+                    </div>
+                )}
             </div>
           )}
         </div>

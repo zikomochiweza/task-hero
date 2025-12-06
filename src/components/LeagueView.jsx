@@ -89,7 +89,8 @@ const LeagueView = () => {
           const isMe = u.email === user.email;
           // Determine status based on rank and thresholds
           const isPromoting = rank <= thresholds.promote;
-          const isRelegating = rank > leagueUsers.length - thresholds.relegate;
+          // Only relegate if league is full (25 users)
+          const isRelegating = leagueUsers.length >= 25 && rank > leagueUsers.length - thresholds.relegate;
           
           return (
             <div 

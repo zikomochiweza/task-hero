@@ -7,7 +7,8 @@ create table profiles (
   league text default 'Bronze',
   streak integer default 0,
   last_login timestamptz default now(),
-  completed_tasks integer default 0
+  completed_tasks integer default 0,
+  avatar_url text
 );
 
 -- Set up Row Level Security (RLS)

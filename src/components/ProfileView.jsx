@@ -1,8 +1,11 @@
 import { useEffect } from 'react';
 import { useTask } from '../context/TaskContext';
+import { supabase } from '../supabaseClient';
+import { useState } from 'react';
 
 const ProfileView = () => {
-  const { user, clearAchievementNotification } = useTask();
+  const { user, clearAchievementNotification, updateProfileInSupabase } = useTask();
+  const [uploading, setUploading] = useState(false);
 
   // Clear notification when viewing profile
   useEffect(() => {
@@ -30,9 +33,55 @@ const ProfileView = () => {
         <div className="bg-white dark:bg-dark-800 rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100 dark:border-dark-700 flex flex-col items-center text-center relative overflow-hidden h-full justify-center">
             <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-r from-blue-500 to-purple-500 opacity-10"></div>
             
-            <div className="w-28 h-28 rounded-full bg-white p-1.5 shadow-xl relative z-10 mb-4">
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-5xl text-white">
-                    👤
+            <div className="w-28 h-28 rounded-full bg-white p-1.5 shadow-xl relative z-10 mb-4 group">
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-5xl text-white overflow-hidden relative">
+                    {user.avatarUrl ? (
+                        <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                        '👤'
+                    )}
+                    
+                    {/* Upload Overlay */}
+                    <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <span className="text-xs text-white font-bold">{uploading ? '...' : 'Change'}</span>
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={async (e) => {
+                                try {
+                                    setUploading(true);
+                                    if (!e.target.files || e.target.files.length === 0) {
+                                        throw new Error('You must select an image to upload.');
+                                    }
+
+                                    const file = e.target.files[0];
+                                    const fileExt = file.name.split('.').pop();
+                                    const fileName = `${user.email}-${Math.random()}.${fileExt}`;
+                                    const filePath = `${fileName}`;
+
+                                    const { error: uploadError } = await supabase.storage
+                                        .from('avatars')
+                                        .upload(filePath, file);
+
+                                    if (uploadError) {
+                                        throw uploadError;
+                                    }
+
+                                    const { data: { publicUrl } } = supabase.storage
+                                        .from('avatars')
+                                        .getPublicUrl(filePath);
+
+                                    await updateProfileInSupabase({ avatarUrl: publicUrl });
+                                } catch (error) {
+                                    alert(error.message);
+                                } finally {
+                                    setUploading(false);
+                                }
+                            }}
+                            disabled={uploading}
+                        />
+                    </label>
                 </div>
                 <div className="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-4 border-white"></div>
             </div>
