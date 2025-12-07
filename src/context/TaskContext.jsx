@@ -90,7 +90,7 @@ export const TaskProvider = ({ children }) => {
           league: 'Bronze',
           cohort_id: cohortId,
           streak: 1,
-          last_login: new Date().toISOString(),
+          last_task_date: new Date().toISOString(),
           night_owl_count: 0,
           early_bird_count: 0,
           streak_7_count: 0,
@@ -114,54 +114,33 @@ export const TaskProvider = ({ children }) => {
             }
         }
 
-        // --- STREAK LOGIC ---
+        // --- STREAK LOGIC (Task Based) ---
         const today = new Date();
-        const lastLogin = new Date(data.last_login);
+        const lastTaskDate = data.last_task_date ? new Date(data.last_task_date) : new Date(0); // Default to epoch if null
         
         // Reset time part to compare dates only (UTC)
         const todayStr = today.toISOString().split('T')[0];
-        const lastLoginStr = lastLogin.toISOString().split('T')[0];
+        const lastTaskDateStr = lastTaskDate.toISOString().split('T')[0];
         
         let newStreak = data.streak;
         
         // Calculate difference in days
-        const diffTime = Math.abs(new Date(todayStr) - new Date(lastLoginStr));
+        const diffTime = Math.abs(new Date(todayStr) - new Date(lastTaskDateStr));
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         let shouldUpdate = false;
 
-        if (todayStr !== lastLoginStr) {
-            if (diffDays === 1) {
-                // Logged in yesterday -> Increment streak
-                newStreak += 1;
-            } else {
-                // Missed a day (or more) -> Reset streak
-                newStreak = 1;
-            }
-            shouldUpdate = true;
-        } else if (data.streak < 1) {
-            // Same day, but streak is 0 (should be 1)
-            newStreak = 1;
+        // Reset check: If more than 1 day difference, reset streak
+        if (diffDays > 1) {
+            newStreak = 0;
             shouldUpdate = true;
         }
             
         if (shouldUpdate) {
-            // --- ACHIEVEMENT: On Fire (7 Day Streak) ---
-            let newStreak7Count = data.streak_7_count || 0;
-            if (newStreak % 7 === 0 && newStreak > 0) {
-                newStreak7Count += 1;
-                setHasNewAchievement(true); // Notify user
-            }
-            
-            // Update DB with new streak, last_login, and achievement
-            await supabase.from('profiles').update({ 
-                streak: newStreak,
-                last_login: today.toISOString(),
-                streak_7_count: newStreak7Count
+             // Update DB with reset streak (streak increment happens in completeTask now)
+             await supabase.from('profiles').update({ 
+                streak: newStreak
             }).eq('id', authUser.id);
-            
-            // Update local state for streak achievement immediately
-            data.streak_7_count = newStreak7Count;
         }
         // --------------------
 
@@ -183,7 +162,8 @@ export const TaskProvider = ({ children }) => {
             finalsWon: data.finals_won || 0,
             finalsWon: data.finals_won || 0,
             top3Finishes: data.top_3_finishes || 0,
-            avatarUrl: data.avatar_url
+            avatarUrl: data.avatar_url,
+            lastTaskDate: data.last_task_date
         }));
       }
       setIsProfileLoaded(true); // Profile is fully loaded
@@ -330,6 +310,7 @@ export const TaskProvider = ({ children }) => {
     if (updates.league !== undefined) dbUpdates.league = updates.league;
     if (updates.cohortId !== undefined) dbUpdates.cohort_id = updates.cohortId;
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
+    if (updates.last_task_date !== undefined) dbUpdates.last_task_date = updates.last_task_date;
 
     // DB Update
     const { error } = await supabase
@@ -541,7 +522,45 @@ export const TaskProvider = ({ children }) => {
       }
       // ------------------------------
 
-      // 1. Optimistic UI Updates
+      // 2. STREAK UPDATE LOGIC
+      const today = new Date();
+      const lastTaskDate = user.lastTaskDate ? new Date(user.lastTaskDate) : new Date(0);
+      const todayStr = today.toISOString().split('T')[0];
+      const lastTaskDateStr = lastTaskDate.toISOString().split('T')[0];
+      
+      let newStreak = user.streak;
+      let newStreak7Count = user.streak7Count;
+
+      // If last task was NOT today (i.e. yesterday or older, or never)
+      if (todayStr !== lastTaskDateStr) {
+          // If streak was reset to 0 (because of >1 day gap), this sets it to 1.
+          // If streak is active (meaning last task was yesterday), increment it.
+          // Note: fetchOrCreateProfile handles the Reset to 0 if >1 day gap. 
+          // However, if we are in the same session without refresh, user.streak might allow increment.
+          // Let's re-verify the "yesterday" condition.
+
+          const diffTime = Math.abs(new Date(todayStr) - new Date(lastTaskDateStr));
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          if (diffDays === 1) {
+             newStreak += 1;
+          } else if (newStreak === 0 || diffDays > 1) {
+             // Restart streak
+             newStreak = 1;
+          }
+          // If diffDays == 0, we already did a task today, don't increment.
+      } else if (newStreak === 0) {
+          // If for some reason streak is 0 but date says today (maybe reset by bug?), set to 1
+          newStreak = 1;
+      }
+      
+      // Streak Achievements
+      if (newStreak % 7 === 0 && newStreak > user.streak && newStreak > 0) {
+           newStreak7Count += 1;
+           setHasNewAchievement(true);
+      }
+
+      // 3. Optimistic UI Updates
       // Update User Stats
       setUser(prev => ({ 
           ...prev, 
@@ -549,7 +568,10 @@ export const TaskProvider = ({ children }) => {
           completedTasks: newCompletedTasks,
           totalXp: newTotalXp,
           nightOwlCount: newNightOwlCount,
-          earlyBirdCount: newEarlyBirdCount
+          earlyBirdCount: newEarlyBirdCount,
+          streak: newStreak,
+          streak7Count: newStreak7Count,
+          lastTaskDate: today.toISOString()
       }));
 
       // Update Tasks List (Move to completed)
@@ -557,15 +579,18 @@ export const TaskProvider = ({ children }) => {
           t.id === id ? { ...t, completed: true, proofUrl: proofUrl || t.proofUrl } : t
       ));
 
-      // 2. Update Supabase Profile
+      // 4. Update Supabase Profile
       await updateProfileInSupabase({ 
           xp: newXp, 
           completedTasks: newCompletedTasks,
           nightOwlCount: newNightOwlCount,
-          earlyBirdCount: newEarlyBirdCount
+          earlyBirdCount: newEarlyBirdCount,
+          streak: newStreak,
+          streak7Count: newStreak7Count,
+          last_task_date: today.toISOString()
       });
 
-      // 3. Update Task in Supabase
+      // 5. Update Task in Supabase
       const updateData = { completed: true };
       if (proofUrl) updateData.proof_url = proofUrl;
 
