@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { useState } from 'react';
 import { useTask } from '../context/TaskContext';
+import { compressImage } from '../utils/imageCompression';
 
 const TaskCard = ({ task }) => {
   const { toggleTask, deleteTask, editTask, completeTask, user } = useTask();
@@ -30,12 +31,15 @@ const TaskCard = ({ task }) => {
         const fileExt = file.name.split('.').pop();
         // Sanitize filename
         const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '');
-        const fileName = `${sanitizedEmail}-${task.id}-${Date.now()}.${fileExt}`;
+        const fileName = `${sanitizedEmail}-${task.id}-${Date.now()}.jpg`; // Force jpg extension
         const filePath = `${fileName}`;
+
+        // Compress image before upload
+        const compressedFile = await compressImage(file);
 
         const { error: uploadError } = await supabase.storage
             .from('task-proofs')
-            .upload(filePath, file);
+            .upload(filePath, compressedFile);
 
         if (uploadError) {
             console.error('Upload error:', uploadError);
