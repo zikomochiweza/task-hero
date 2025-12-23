@@ -31,7 +31,8 @@ export const TaskProvider = ({ children }) => {
     streak7Count: 0,
     name: 'TaskHero User',
     email: 'user@taskhero.app',
-    avatarUrl: null
+    avatarUrl: null,
+    lastLeagueReset: new Date().toISOString()
   });
 
   // 1. Handle Auth & Initial Profile Fetch
@@ -163,7 +164,8 @@ export const TaskProvider = ({ children }) => {
             finalsWon: data.finals_won || 0,
             top3Finishes: data.top_3_finishes || 0,
             avatarUrl: data.avatar_url,
-            lastTaskDate: data.last_task_date
+            lastTaskDate: data.last_task_date,
+            lastLeagueReset: data.last_league_reset || new Date().toISOString()
         }));
       }
       setIsProfileLoaded(true); // Profile is fully loaded
@@ -325,7 +327,9 @@ export const TaskProvider = ({ children }) => {
     if (updates.league !== undefined) dbUpdates.league = updates.league;
     if (updates.cohortId !== undefined) dbUpdates.cohort_id = updates.cohortId;
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
+    if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
     if (updates.last_task_date !== undefined) dbUpdates.last_task_date = updates.last_task_date;
+    if (updates.lastLeagueReset !== undefined) dbUpdates.last_league_reset = updates.lastLeagueReset;
 
     // DB Update
     const { error } = await supabase
@@ -389,10 +393,11 @@ export const TaskProvider = ({ children }) => {
     
     await updateProfileInSupabase(updates);
 
-    // 5. Mark as processed for this week
-    const today = new Date();
-    const currentWeek = getWeekNumber(today);
-    localStorage.setItem('taskquest_last_league_update', JSON.stringify({ week: currentWeek, year: today.getFullYear() }));
+    await updateProfileInSupabase(updates);
+
+    // 5. Mark as processed for this week in DB
+    const now = new Date();
+    await updateProfileInSupabase({ lastLeagueReset: now.toISOString() });
     
     setHasLeagueUpdate(true); // Notify user of league update
     setMotivation(notification);
@@ -412,21 +417,27 @@ export const TaskProvider = ({ children }) => {
     if (!session?.user || !isProfileLoaded) return; // Wait for login AND profile load
 
     const checkWeeklyReset = () => {
-      const lastUpdate = localStorage.getItem('taskquest_last_league_update');
+      if (!user.lastLeagueReset) return;
+
+      const lastResetDate = new Date(user.lastLeagueReset);
       const today = new Date();
-      const currentWeek = getWeekNumber(today);
       
-      if (!lastUpdate) {
-          // First run, set current week
-          localStorage.setItem('taskquest_last_league_update', JSON.stringify({ week: currentWeek, year: today.getFullYear() }));
-      } else if (JSON.parse(lastUpdate).week !== currentWeek) {
-        // It's a new week!
-        processWeeklyReset();
+      const lastResetWeek = getWeekNumber(lastResetDate);
+      const currentWeek = getWeekNumber(today);
+      const lastResetYear = lastResetDate.getFullYear();
+      const currentYear = today.getFullYear();
+      
+      // Check if it's a new week and we haven't reset yet
+      // Logic: If current year > last reset year OR (same year AND current week > last reset week)
+      // Note: week 1 of new year handles automatically if getWeekNumber is standard ISO
+      if (currentYear > lastResetYear || (currentYear === lastResetYear && currentWeek !== lastResetWeek)) {
+          console.log(`Weekly Reset Triggered: Last ${lastResetWeek}, Current ${currentWeek}`);
+          processWeeklyReset();
       }
     };
     checkWeeklyReset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, isProfileLoaded]); // Run when session OR profile loaded status changes
+  }, [session, isProfileLoaded, user.lastLeagueReset]); // Run when session, profile, or reset date changes
 
   // Local Storage Backup (Legacy/Offline support)
   useEffect(() => {
