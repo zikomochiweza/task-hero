@@ -182,6 +182,7 @@ export const TaskProvider = ({ children }) => {
   const clearLeagueNotification = () => setHasLeagueUpdate(false);
 
   // --- NOTIFICATIONS ---
+  // --- NOTIFICATIONS ---
   const requestNotificationPermission = async () => {
     if (!("Notification" in window)) return;
     if (Notification.permission !== "granted" && Notification.permission !== "denied") {
@@ -195,6 +196,29 @@ export const TaskProvider = ({ children }) => {
     }
   };
 
+  // Email Notification Helper
+  const sendEmailNotification = async (type, payload) => {
+    if (!session?.user?.email) return;
+    
+    console.log(`Attempting to send email [${type}] to ${session.user.email}`);
+    
+    try {
+        const { error } = await supabase.functions.invoke('send-email', {
+            body: {
+                type,
+                email: session.user.email,
+                name: user.name,
+                ...payload
+            }
+        });
+
+        if (error) throw error;
+        console.log(`Email sent successfully: ${type}`);
+    } catch (err) {
+        console.error('Failed to send email notification:', err);
+    }
+  };
+
   // Check for Streak Risk & Inactivity
   useEffect(() => {
     if (!isProfileLoaded || !user) return;
@@ -204,61 +228,52 @@ export const TaskProvider = ({ children }) => {
     const checkStatus = () => {
         const now = new Date();
         const hour = now.getHours();
-        const tasksDoneToday = tasks.some(t => {
-            const taskDate = new Date(t.created_at); // Assuming created_at is completion time for completed tasks, or check updated_at if available. 
-            // Actually, for simplicity, let's check user.completedTasks vs stored count or just check if any task in list is completed today.
-            // Better: Check if last_login was today AND if completedTasks increased. 
-            // Simplest for now: Check if any task in `tasks` array is completed and updated today.
-            return t.completed; // We need a better "done today" check, but let's rely on user.last_login for "visited" and local state for "done".
-        });
+        const todayStr = now.toISOString().split('T')[0];
         
-        // We really need a "tasks_completed_today" flag or check. 
-        // Let's assume if user.xp hasn't changed from a stored "start of day" value? 
-        // Or simpler: Just check if they have 0 completed tasks in the `tasks` list that are marked completed today.
-        // For this implementation, let's just check if they have ANY completed tasks for today.
-        
+        // Key for local storage to prevent multiple notifications per day
+        const NOTIF_KEY = `taskquest_notif_${todayStr}`;
+        const sentNotifications = JSON.parse(localStorage.getItem(NOTIF_KEY) || '{}');
+
+        // Check if user has done a task today
+        const lastTaskDate = user.lastTaskDate ? new Date(user.lastTaskDate) : null;
+        const lastTaskDateStr = lastTaskDate ? lastTaskDate.toISOString().split('T')[0] : '';
+        const hasDoneTaskToday = lastTaskDateStr === todayStr;
+
         // 1. Streak Risk (After 8 PM)
-        if (hour >= 20 && user.streak > 0) {
-             // Logic: If they haven't done a task today. 
-             // Since we don't track "done today" explicitly in profile, we'll approximate.
-             // If last_login is today but we want to know if they DID a task.
-             // Let's just send a generic nudge if it's late.
-             const random = Math.random();
-             const msg = random > 0.5 
-                ? "Losing your streak after so long would suck 😢" 
-                : "🔥 Keep the flame alive! Don't lose your streak!";
-             sendNotification("Streak Risk!", msg);
+        if (hour >= 20 && user.streak > 0 && !hasDoneTaskToday) {
+             if (!sentNotifications.streak_risk) {
+                 const msg = "🔥 Keep the flame alive! Don't lose your streak!";
+                 sendNotification("Streak Risk!", msg);
+                 sendEmailNotification('streak_risk', { streak: user.streak });
+                 
+                 // Mark as sent
+                 localStorage.setItem(NOTIF_KEY, JSON.stringify({ ...sentNotifications, streak_risk: true }));
+             }
         }
 
         // 2. Inactivity (Mid-day check, e.g., 2 PM)
-        if (hour === 14) {
-             const msgs = [
-                 "Lacking consistency I see you 👀",
-                 "Try doing a task today 💪",
-                 "Small steps lead to big goals! 🚀"
-             ];
-             const msg = msgs[Math.floor(Math.random() * msgs.length)];
-             sendNotification("TaskQuest", msg);
+        if (hour >= 14 && hour < 20 && !hasDoneTaskToday) {
+             if (!sentNotifications.nudge) {
+                 const msgs = [
+                     "Lacking consistency I see you 👀",
+                     "Try doing a task today 💪",
+                     "Small steps lead to big goals! 🚀"
+                 ];
+                 const msg = msgs[Math.floor(Math.random() * msgs.length)];
+                 sendNotification("TaskQuest", msg);
+                 
+                 localStorage.setItem(NOTIF_KEY, JSON.stringify({ ...sentNotifications, nudge: true }));
+             }
         }
     };
 
-    // Run check once on load (if appropriate time)
-    try {
-        checkStatus();
-    } catch (e) {
-        console.error("Error in notification check:", e);
-    }
+    // Run check once on load
+    checkStatus();
     
     // Set interval to check every hour
-    const interval = setInterval(() => {
-        try {
-            checkStatus();
-        } catch (e) {
-            console.error("Error in notification interval:", e);
-        }
-    }, 1000 * 60 * 60);
+    const interval = setInterval(checkStatus, 1000 * 60 * 60);
     return () => clearInterval(interval);
-  }, [isProfileLoaded, user.streak, tasks]); // Added tasks to dependency
+  }, [isProfileLoaded, user.streak, user.lastTaskDate]); // Correct dependencies
 
   // Real-time League Monitoring (Overtaken)
   useEffect(() => {
@@ -381,6 +396,7 @@ export const TaskProvider = ({ children }) => {
     
     setHasLeagueUpdate(true); // Notify user of league update
     setMotivation(notification);
+    sendEmailNotification('league_update', { league: newLeague }); // Send email summary
     setTimeout(() => setMotivation(null), 5000);
   };
 
@@ -511,6 +527,8 @@ export const TaskProvider = ({ children }) => {
       if (currentHour >= 22 || currentHour < 4) {
           newNightOwlCount += 1;
           setHasNewAchievement(true); // Notify user
+          sendNotification("Achievement Unlocked!", "Night Owl 🌙");
+          sendEmailNotification('achievement', { achievement: "Night Owl 🌙" });
       }
       
       // --- ACHIEVEMENT: Early Bird ---
@@ -519,6 +537,8 @@ export const TaskProvider = ({ children }) => {
       if (currentHour >= 5 && currentHour < 9) {
           newEarlyBirdCount += 1;
           setHasNewAchievement(true); // Notify user
+          sendNotification("Achievement Unlocked!", "Early Bird 🌅");
+          sendEmailNotification('achievement', { achievement: "Early Bird 🌅" });
       }
       // ------------------------------
 
@@ -558,6 +578,8 @@ export const TaskProvider = ({ children }) => {
       if (newStreak % 7 === 0 && newStreak > user.streak && newStreak > 0) {
            newStreak7Count += 1;
            setHasNewAchievement(true);
+           sendNotification("Achievement Unlocked!", "On Fire 🔥");
+           sendEmailNotification('achievement', { achievement: "streak_7 (7 Day Streak) 🔥" });
       }
 
       // 3. Optimistic UI Updates
